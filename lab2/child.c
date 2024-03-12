@@ -10,8 +10,7 @@ int main(int argc, char** argv, char** envp){
     pid_t ppid=getppid();
     extern char** environ;
 
-    printf("NAME: %s\nPID: %d\nPPID: %d\n", argv[0], (int)pid, (int)ppid);
-    printf("%c\n",argv[2][0]);
+    printf("NAME: %s\nPID: %d\nPPID: %d\n\n", argv[0], (int)pid, (int)ppid);
     switch(argv[2][0]){
     case '+':
         getEnvironmnetByChild(argv[1], NULL);
@@ -23,7 +22,7 @@ int main(int argc, char** argv, char** envp){
         getEnvironmnetByChild(argv[1], environ);
         break;
     }
-
+    printf("\n");
     exit(EXIT_SUCCESS);
 }
 

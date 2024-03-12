@@ -4,7 +4,7 @@ void selectOption(char* varFile, char** env){
     char option;
     extern char** environ;
     do{
-        scanf("%c",&option);
+        option=getchar();
         switch(option){
         case '+':
             executeChild(getenv("CHILD_PATH"), varFile, option);
@@ -24,7 +24,10 @@ void executeChild(char* childPath, char* varFile, char option){
     static int childCounter=0;
     childCounter++;
 
-    if(childCounter>=100) return;
+    if(childCounter>=100){
+        printf("Too much processes! Exit\n");
+        exit(EXIT_SUCCESS);
+    }
 
     char childName[10];
     snprintf(childName, sizeof(childName), "child_%02d", childCounter);
@@ -40,14 +43,15 @@ void executeChild(char* childPath, char* varFile, char option){
         exit(EXIT_FAILURE);
     }
     
-    strcat(childPath, "/child");
-    createChildEnvironment(varFile, &envp);
-    printf("%s\n",childPath);
+    else if(pid==0){
+        strcat(childPath, "/child");
+        createChildEnvironment(varFile, &envp);
 
-    execve(childPath, argv, envp);
+        execve(childPath, argv, envp);
 
-    perror("execve");
-    exit(EXIT_FAILURE);
+        perror("execve");
+        exit(EXIT_FAILURE);
+    }
 
     waitpid(pid, NULL, 0);
 }
