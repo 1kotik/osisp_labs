@@ -5,7 +5,8 @@ int main(int argc, char** argv, char** envp){
         printf("Specify only variables file\n");
         exit(EXIT_FAILURE);
     }
-
+    pid_t ppid=getppid();
+    printf("%d\n", (int)ppid);
     getEnvironmentByParent();
     selectOption(argv[1], envp);
     exit(EXIT_SUCCESS);

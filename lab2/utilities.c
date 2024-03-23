@@ -48,9 +48,6 @@ void executeChild(char* childPath, char* varFile, char option){
         createChildEnvironment(varFile, &envp);
 
         execve(childPath, argv, envp);
-
-        perror("execve");
-        exit(EXIT_FAILURE);
     }
 
     waitpid(pid, NULL, 0);
