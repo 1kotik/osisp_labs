@@ -14,7 +14,6 @@ typedef struct pair{
 
 bool print;
 bool alarmEnded;
-bool signalCheck;
 memory pair={0,0};
 counter stat={0,0,0,0};
 
@@ -53,11 +52,9 @@ int main(int argc,char*argv[]){
 void userHandler(int signal){
     if(signal==SIGUSR1){
         print=true;
-        signalCheck=true;
     }
     else if(signal==SIGUSR2){
         print=false;
-        signalCheck=true;
     }
 }
 
