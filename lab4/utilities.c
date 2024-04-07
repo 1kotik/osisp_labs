@@ -1,153 +1,107 @@
-#include "parent.h"
+#include "utilities.h"
 
-int main(int argc,char*argv[]){
-    int pid=(int)getpid();
-    int ppid=(int)getppid();
-    printf("Name: %s PID: %d PPID: %d\n", argv[0],pid,ppid);
+Message generateMessage(){
+    Message message;
+    message.hash=0;
+    message.size=rand()%257;
 
-    signal(SIGALRM, alarmHandler);
+    for(int i=0;i<message.size;i++){
+        message.data[i]=rand()%257;
+        message.hash^=message.data[i];
+    }
 
-    chooseOption(argv[1]);
-
-    exit(EXIT_SUCCESS);
+    if(message.size==256) message.size=0;
+    
+    return message;
 }
 
-
-void chooseOption(char* childPath){
-    char option[10];
-    do{
-        fgets(option,10,stdin);
-        switch(option[0]){
-        case '+':
-            executeChild(childPath);
-            break;
-        case '-':
-            closeLastProcess();
-            break;
-        case 'l':
-            printProcesses();
-            break;
-        case 'k':
-            closeAllChildren();
-            break;
-        case 's':
-            if(option[1]=='\n') allowPrintingEveryone(false);
-            else allowPrintingChild(atoi(option+1), false);
-            break;
-        case 'g':
-            if(option[1]=='\n') allowPrintingEveryone(true);
-            else allowPrintingChild(atoi(option+1), true);
-            break;
-        case 'p':
-            if(option[1]!='\n') requestPrinting(atoi(option+1));
-            break;
-        }
-        rewind(stdin);
-    }while(option[0]!='q');
-    closeAllChildren();
-    exit(EXIT_SUCCESS);
+void createQueue(MessageQueue* queue, size_t capacity){
+    queue->capacity=capacity;
+    queue->head=capacity-1;
+    queue->tail=capacity-1;
+    queue->consumedCount=0;
+    queue->producedCount=0;
 }
 
-void executeChild(char* childPath){
-    static int childCounter=0;
-    childCounter++;
-
-    if(childCounter>=50){
-        printf("Too much processes! Exit\n");
-        exit(EXIT_SUCCESS);
-    }
-
-    char childName[10];
-    snprintf(childName, sizeof(childName), "C_%d", childCounter);
-    char*argv[]={childName, NULL};
-    pid_t pid=fork();
-
-    if(pid==-1){
-        perror("fork");
-        exit(EXIT_FAILURE);
-    }
-    else if(pid==0){
-        strcat(childPath, "/child");
-        execve(childPath, argv, NULL);
-        
-        perror("execve");
-        exit(EXIT_FAILURE);
-    }
-    else{
-        usleep(15000);
-        kill(pid, SIGUSR1);
-    }
-
-}
-
-void closeLastProcess(){
-    pid_t** children=getChildren();
-    int last=0;
-
-    for(;children[last];last++);
-
-    if(last==0){
-        printf("No children\n");
-        freeChildren(children);
+void putMessage(MessageQueue* queue, Message message){
+    if(queue->producedCount-queue->consumedCount==queue->capacity){
+        printf("Queue is full.\n");
         return;
     }
-    printf("Process %s was deleted. %d remained.\n", getNameByPid(*(children[last-1])),last-1);
-    kill(*(children)[last-1], SIGKILL);
-    waitpid(*(children[last- 1]), NULL, 0);
-    freeChildren(children);
+
+    queue->messages[queue->head--]=message;
+    queue->producedCount++;
+
+    if(queue->head<0) queue->head=queue->capacity-1;
 }
 
-void printProcesses(){
-    int pid=(int)getpid();
-    int ppid=(int)getppid();
-    printf("Parent name: %s PID: %d PPID: %d\n", getNameByPid(pid),pid,ppid);
-    printf("Children:\n");
-    pid_t** children=getChildren();
-    for(int i=0;children[i];i++) printf("Name: %s PID: %d\n", getNameByPid(*(children[i])), (int)*(children[i]));
-    freeChildren(children);
-}
-
-void closeAllChildren(){
-    pid_t **children = getChildren();
-    for (int i = 0; children[i]; i++){
-        char *pname = getNameByPid(*(children[i]));
-        kill(*(children[i]),SIGKILL);
-        printf("Process %s was deleted\n", pname);
-        waitpid(*(children[i]), NULL, 0);
+Message getMessage(MessageQueue* queue){
+    if(queue->producedCount==queue->consumedCount){
+        printf("Queue is empty.\n");
+        return (Message){0};
     }
-    freeChildren(children);
+
+    Message message=queue->messages[queue->tail--];
+    queue->consumedCount++;
+
+    if(queue->tail<0) queue->tail=queue->capacity-1;
+
+    return message;
 }
 
-void allowPrintingEveryone(bool allowance){
-    pid_t** children=getChildren();
-    for(int i=0;children[i];i++){
-        if(allowance) kill(*(children[i]), SIGUSR1);
-        else kill(*(children[i]), SIGUSR2);
+void printMessage(Message message){
+    printf("MESSAGE:  Type: %d  Hash: %d  Size: %d\nData: ", message.type, message.hash, message.size);
+    if(message.hash!=0){
+        for(int i=0;i<message.size;i++) printf("%d ", message.data[i]);
     }
-    freeChildren(children);
+    printf("\n");
 }
 
-void allowPrintingChild(int number, bool allowance){
-    char name[10];
-    snprintf(name, 10, "C_%i", number);
-    pid_t pid=getPidByName(name);
-    if(pid==-1){
-        printf("No such process\n");
-        allowPrintingEveryone(true);
-        return;
+void printMessageQueue(MessageQueue* queue){
+    printf("BUFFER:  Produced: %d  Consumed: %d  Capacity: %d  Current size: %d\n", 
+    queue->producedCount, queue->consumedCount, queue->capacity, queue->producedCount-queue->consumedCount);
+}
+
+void createSemaphores(Semaphores* semaphores, size_t queueCapacity){
+
+    if(sem_init(&semaphores->freeSpace, 1, queueCapacity)==-1){
+        perror("free space semaphore error");
+        exit(EXIT_FAILURE);
     }
-    if(allowance) kill(pid, SIGUSR1);
-    else kill(getPidByName(name), SIGUSR2);
+
+    if(sem_init(&semaphores->itemsToConsume, 1, 0)==-1){
+        perror("items to consume semaphore error");
+        exit(EXIT_FAILURE);
+    }
+
+    if(sem_init(&semaphores->mutex, 1, 1)==-1){
+        perror("mutex error");
+        exit(EXIT_FAILURE);
+    }
+
 }
 
-void requestPrinting(int number){
-    allowPrintingEveryone(false);
-    allowPrintingChild(number,true);
-    alarm(5);
+void createSharedMemory(int* queueID, int* semaphoresID, int* dataID, size_t capacity){
+    key_t queueKey=ftok(".",'a');
+    key_t semaphoresKey=ftok(".",'b');
+    key_t dataKey=ftok(".",'c');        //for queue->messages field
+
+    if(queueKey==-1||semaphoresKey==-1||dataKey==-1){
+        perror("ftok error");
+        exit(EXIT_FAILURE);
+    }
+
+    *queueID=shmget(queueKey, (sizeof(MessageQueue)+capacity*sizeof(Message)), IPC_CREAT | 0666);
+    *semaphoresID=shmget(semaphoresKey, sizeof(Semaphores), IPC_CREAT | 0666);
+    *dataID=shmget(dataKey, (sizeof(Message)*capacity), IPC_CREAT | 0666);
+    if(*queueID==-1||*semaphoresID==-1){
+        perror("shmget error");
+        exit(EXIT_FAILURE);              
+    }
 }
 
-void alarmHandler(int signal){
-    if(signal==SIGALRM) allowPrintingEveryone(true);
+void detachSharedMemory(void* ptr){
+    shmdt(ptr); //why error??
 }
 
 pid_t **getChildren(){
@@ -311,4 +265,32 @@ void freeChildren(pid_t **children){
     for (int i = 0; children[i]; i++)
         free(children[i]);
     free(children);
+}
+
+void closeAllChildren(){
+    pid_t **children = getChildren();
+    for (int i = 0; children[i]; i++){
+        char *pname = getNameByPid(*(children[i]));
+        kill(*(children[i]),SIGKILL);
+        printf("Process %s was deleted\n", pname);
+        waitpid(*(children[i]), NULL, 0);
+    }
+    freeChildren(children);
+}
+
+void closeLastProcess(){
+    pid_t** children=getChildren();
+    int last=0;
+
+    for(;children[last];last++);
+
+    if(last==0){
+        printf("No children\n");
+        freeChildren(children);
+        return;
+    }
+    printf("Process %s was deleted. %d remained.\n", getNameByPid(*(children[last-1])),last-1);
+    kill(*(children)[last-1], SIGKILL);
+    waitpid(*(children[last- 1]), NULL, 0);
+    freeChildren(children);
 }
