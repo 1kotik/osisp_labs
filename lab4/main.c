@@ -29,6 +29,7 @@ int main(int argc, char* argv[]){
 
     createQueue(queue,capacity);
     createSemaphores(semaphores,capacity);
+    printf("p - producer\nc - consumer\nl - list info\n- - kill children\n");
     do{
         option=getchar();
         switch(option){
@@ -120,16 +121,3 @@ void printInfo(){
     sem_post(&semaphores->mutex);
 }
 
-int initializeSharedMemory(int projID){
-    key_t queue_key = ftok(".", projID);
-    if (queue_key == -1) {
-        perror("ftok");
-        exit(1);
-    }
-    int shmid = shmget(queue_key, sizeof(Semaphores), IPC_CREAT | 0666);
-    if (shmid == -1) {
-        perror("shmget error");
-        exit(1);
-    }
-    return shmid;
-}
