@@ -84,7 +84,7 @@ void createSemaphores(Semaphores* semaphores, size_t queueCapacity){
 void createSharedMemory(int* queueID, int* semaphoresID, int* dataID, size_t capacity){
     key_t queueKey=ftok(".",'a');
     key_t semaphoresKey=ftok(".",'b');
-    key_t dataKey=ftok(".",'c');        //for queue->messages field
+    key_t dataKey=ftok(".",'c');     
 
     if(queueKey==-1||semaphoresKey==-1||dataKey==-1){
         perror("ftok error");
@@ -94,6 +94,7 @@ void createSharedMemory(int* queueID, int* semaphoresID, int* dataID, size_t cap
     *queueID=shmget(queueKey, (sizeof(MessageQueue)+capacity*sizeof(Message)), IPC_CREAT | 0666);
     *semaphoresID=shmget(semaphoresKey, sizeof(Semaphores), IPC_CREAT | 0666);
     *dataID=shmget(dataKey, (sizeof(Message)*capacity), IPC_CREAT | 0666);
+
     if(*queueID==-1||*semaphoresID==-1){
         perror("shmget error");
         exit(EXIT_FAILURE);              
@@ -101,7 +102,7 @@ void createSharedMemory(int* queueID, int* semaphoresID, int* dataID, size_t cap
 }
 
 void detachSharedMemory(void* ptr){
-    shmdt(ptr); //why error??
+    shmdt(ptr); 
 }
 
 pid_t **getChildren(){
@@ -271,6 +272,7 @@ void closeAllChildren(){
     pid_t **children = getChildren();
     for (int i = 0; children[i]; i++){
         char *pname = getNameByPid(*(children[i]));
+        kill(*(children[i]),SIGUSR1);
         kill(*(children[i]),SIGKILL);
         printf("Process %s was deleted\n", pname);
         waitpid(*(children[i]), NULL, 0);
