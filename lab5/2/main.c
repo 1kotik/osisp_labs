@@ -48,9 +48,6 @@ int main(int argc, char* argv[]){
         case 'l':
             printInfo();
             break;
-        case 'd':
-            closeAllThreads();
-            break;
         case '+':
             if(queue->capacity==MAX_SIZE-1){
                 printf("Max size is 1000\n");
@@ -70,7 +67,7 @@ int main(int argc, char* argv[]){
         }
         rewind(stdin);
     }while(option!='q');
-
+    closeAllThreads();
     pthread_mutex_destroy(&mutex);
     pthread_cond_destroy(&condConsume);
     pthread_cond_destroy(&condProduce);
@@ -79,6 +76,7 @@ int main(int argc, char* argv[]){
 }
 
 void* produce(){
+    pthread_detach(pthread_self());
     while(allowance){
         pthread_mutex_lock(&mutex);
         if(storage==maxStorage){
@@ -98,6 +96,7 @@ void* produce(){
 }
 
 void* consume(){
+    pthread_detach(pthread_self());
     while(allowance){
         pthread_mutex_lock(&mutex);
         if(storage==0){
@@ -129,7 +128,6 @@ void closeAllThreads(){
     allowance=false;
     for(int i=0;i<threadCounter;i++){
         pthread_cancel(threads[i]);
-        pthread_join(threads[i],NULL);
     }
     threadCounter=0;
     producers=0;
